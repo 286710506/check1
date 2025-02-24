@@ -1,67 +1,79 @@
 package com.textcheck;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.Callable;
-
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-
-@Command(name = "similarity-check", 
-        mixinStandardHelpOptions = true, 
-        version = "1.0",
-        description = "检查两段文本的相似度")
-public class SimilarityChecker implements Callable<Integer> {
-
-    @Option(names = {"-a", "--algorithm"}, 
-            description = "选择算法: cosine (余弦相似度) 或 levenshtein (编辑距离)", 
-            defaultValue = "cosine")
-    private String algorithm;
-
-    @Option(names = {"-f", "--file"}, 
-            description = "从文件读取文本", 
-            required = false)
-    private boolean fromFile;
-
-    @Parameters(index = "0", 
-            description = "第一段文本或文件路径")
-    private String text1;
-
-    @Parameters(index = "1", 
-            description = "第二段文本或文件路径")
-    private String text2;
-
-    @Override
-    public Integer call() throws Exception {
-        String content1 = fromFile ? readFile(text1) : text1;
-        String content2 = fromFile ? readFile(text2) : text2;
-
-        SimilarityCalculator calculator;
-        if ("cosine".equalsIgnoreCase(algorithm)) {
-            calculator = new CosineSimilarity();
-        } else if ("levenshtein".equalsIgnoreCase(algorithm)) {
-            calculator = new LevenshteinDistance();
-        } else {
-            System.err.println("不支持的算法: " + algorithm);
-            return 1;
+/**
+ * 文本相似度检查程序
+ */
+public class SimilarityChecker {
+    public static void main(String[] args) {
+        if (args.length < 2) {
+            System.out.println("用法：");
+            System.out.println("直接文本比较：");
+            System.out.println("  <text1> <text2> [-a algorithm]");
+            System.out.println("文件比较：");
+            System.out.println("  -f <file1> <file2> [-a algorithm]");
+            System.out.println("算法选项：");
+            System.out.println("  -a cosine     (默认) 使用余弦相似度");
+            System.out.println("  -a levenshtein 使用编辑距离");
+            System.out.println("  -a jaccard    使用Jaccard相似度");
+            return;
         }
 
-        double similarity = calculator.calculate(content1, content2);
-        System.out.printf("文本相似度: %.2f%%%n", similarity * 100);
-        return 0;
-    }
+        String algorithm = "cosine";  // 默认使用余弦相似度
+        String text1 = "";
+        String text2 = "";
+        boolean isFile = false;
 
-    private String readFile(String filePath) throws IOException {
-        Path path = Paths.get(filePath);
-        return Files.readString(path);
-    }
+        // 解析命令行参数
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "-f":
+                    isFile = true;
+                    if (i + 2 < args.length) {
+                        text1 = args[++i];
+                        text2 = args[++i];
+                    }
+                    break;
+                case "-a":
+                    if (i + 1 < args.length) {
+                        algorithm = args[++i].toLowerCase();
+                    }
+                    break;
+                default:
+                    if (text1.isEmpty()) {
+                        text1 = args[i];
+                    } else if (text2.isEmpty()) {
+                        text2 = args[i];
+                    }
+                    break;
+            }
+        }
 
-    public static void main(String[] args) {
-        int exitCode = new CommandLine(new SimilarityChecker()).execute(args);
-        System.exit(exitCode);
+        // 选择相似度算法
+        SimilarityCalculator calculator;
+        switch (algorithm) {
+            case "levenshtein":
+                calculator = new LevenshteinDistance();
+                break;
+            case "jaccard":
+                calculator = new JaccardSimilarity();
+                break;
+            case "cosine":
+            default:
+                calculator = new CosineSimilarity();
+                break;
+        }
+
+        // 如果是文件比较，读取文件内容
+        if (isFile) {
+            // TODO: 实现文件读取逻辑
+            System.out.println("文件比较功能尚未实现");
+            return;
+        }
+
+        // 计算相似度
+        double similarity = calculator.calculate(text1, text2);
+        
+        // 格式化输出，保留两位小数
+        System.out.printf("文本相似度: %.2f%%\n", similarity * 100);
     }
 }
